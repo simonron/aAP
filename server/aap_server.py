@@ -3,7 +3,7 @@ import json, os, tempfile
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
-HOST=os.environ.get('AAP_HOST','0.0.0.0'); PORT=int(os.environ.get('AAP_PORT','8788'))
+HOST=os.environ.get('AAP_HOST','0.0.0.0'); PORT=int(os.environ.get('AAP_PORT','8789'))
 DATA=os.path.expanduser(os.environ.get('AAP_DATA','~/Library/Application Support/aAP/records.json'))
 os.makedirs(os.path.dirname(DATA),exist_ok=True)
 
@@ -21,20 +21,20 @@ def write_data(v):
         if os.path.exists(tmp): os.unlink(tmp)
 
 class H(BaseHTTPRequestHandler):
-    def headers(self,code=200):
+    def send_json_headers(self,code=200):
         self.send_response(code); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Access-Control-Allow-Origin','*'); self.send_header('Access-Control-Allow-Methods','GET,PUT,OPTIONS'); self.send_header('Access-Control-Allow-Headers','Content-Type'); self.send_header('Cache-Control','no-store'); self.end_headers()
-    def do_OPTIONS(self): self.headers(204)
+    def do_OPTIONS(self): self.send_json_headers(204)
     def do_GET(self):
-        if urlparse(self.path).path!='/api/records': self.headers(404); return
-        self.headers(); self.wfile.write(json.dumps(read_data(),ensure_ascii=False).encode())
+        if urlparse(self.path).path!='/api/records': self.send_json_headers(404); return
+        self.send_json_headers(); self.wfile.write(json.dumps(read_data(),ensure_ascii=False).encode())
     def do_PUT(self):
-        if urlparse(self.path).path!='/api/records': self.headers(404); return
+        if urlparse(self.path).path!='/api/records': self.send_json_headers(404); return
         try:
             n=int(self.headers.get('Content-Length','0')); v=json.loads(self.rfile.read(n) or b'[]')
             if not isinstance(v,list): raise ValueError()
-            write_data(v); self.headers(); self.wfile.write(b'{"ok":true}')
+            write_data(v); self.send_json_headers(); self.wfile.write(b'{"ok":true}')
         except Exception:
-            self.headers(400); self.wfile.write(b'{"ok":false}')
+            self.send_json_headers(400); self.wfile.write(b'{"ok":false}')
     def log_message(self,fmt,*args): print('%s - %s'%(self.address_string(),fmt%args))
 
 print(f'aAP shared data server: http://{HOST}:{PORT}/api/records')
