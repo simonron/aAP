@@ -1,0 +1,74 @@
+name: Apply row measurement help
+on:
+  push:
+    paths:
+      - '.github/workflows/add-row-measurement-help.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add row-specific help popups
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('aap_tracker/index.html')
+          s=p.read_text()
+          s=s.replace('Version 3.4','Version 3.5').replace("APP_VERSION='3.4'","APP_VERSION='3.5'")
+          s=s.replace('.nowbtn{width:auto}', '.nowbtn{width:auto}.helpbtn{width:auto;min-width:32px;font-weight:bold}.measurehelp{border:0;border-radius:10px;max-width:520px;width:calc(100% - 32px);padding:20px;box-shadow:0 8px 30px #0004}.measurehelp::backdrop{background:#0007}.measurehelp h3{margin-top:0}.measurehelp .closehelp{float:right}')
+          old='<div class="card grid"><div><label>Patient Name</label>'
+          new='<dialog id="measureHelp" class="measurehelp"><button class="closehelp" onclick="document.getElementById(\'measureHelp\').close()">Close</button><h3 id="helpTitle">Measurement instructions</h3><div id="helpText"></div></dialog>'+old
+          if old not in s: raise SystemExit('patient marker not found')
+          s=s.replace(old,new,1)
+          marker="function status(s){$('status').textContent=s}"
+          helpcode="""const measurementHelp=[
+          [
+            '<b>On waking — lying.</b><br>Take the first measurement while lying down.',
+            '<b>On waking — sitting.</b><br>After the lying measurement, sit for 3 minutes, then take the BP/HR measurement.',
+            '<b>On waking — standing.</b><br>After the sitting measurement, stand for 3 minutes, then take the BP/HR measurement. Lean against a wall if needed; sit or lie down if symptoms worsen.'
+          ],
+          [
+            '<b>Breakfast — lying.</b><br>After a standard breakfast, within 10–15 minutes take a measurement lying down. Record what food and drink you consumed, including alcohol.',
+            '<b>Breakfast — standing.</b><br>After the lying reading, stand for 3 minutes and then take the measurement. If standing is difficult, substitute sitting.'
+          ],
+          [
+            '<b>Morning exertion — before exertion.</b><br>Record a baseline measurement before the activity. The activity may be physical, cognitive or emotional and should be separate from lunch and dinner.',
+            '<b>Morning exertion — after exertion.</b><br>After 3–5 minutes of activity, take the measurement. Examples include gentle walking or stairs, an exciting match or film, or a crossword. Attempt physical exertion if possible.'
+          ],
+          [
+            '<b>Lunch — lying.</b><br>After a standard lunch, within 10–15 minutes take a measurement lying down. Record what food and drink you consumed, including alcohol.',
+            '<b>Lunch — standing.</b><br>After the lying reading, stand for 3 minutes and then take the measurement. If standing is difficult, substitute sitting.'
+          ],
+          [
+            '<b>Afternoon exertion — before exertion.</b><br>Record a baseline measurement before the activity. The activity may be physical, cognitive or emotional and should be separate from lunch and dinner.',
+            '<b>Afternoon exertion — after exertion.</b><br>After 3–5 minutes of activity, take the measurement. Examples include gentle walking or stairs, an exciting match or film, or a crossword. Attempt physical exertion if possible.'
+          ],
+          [
+            '<b>Dinner — lying.</b><br>After a standard dinner, within 10–15 minutes take a measurement lying down. Record what food and drink you consumed, including alcohol.',
+            '<b>Dinner — standing.</b><br>After the lying reading, stand for 3 minutes and then take the measurement. If standing is difficult, substitute sitting.'
+          ],
+          [
+            '<b>Before sleeping.</b><br>Take the measurement lying in your usual sleeping position, including your usual pillows.'
+          ],
+          [
+            '<b>Additional activity or symptom event.</b><br>Record any other activity that worsens your symptoms, including the time, event/activity and position (lying, sitting or standing).',
+            '<b>Additional activity or symptom event.</b><br>Record any other activity that worsens your symptoms, including the time, event/activity and position (lying, sitting or standing).'
+          ]
+          ];
+          function showMeasureHelp(si,ri){$('helpTitle').textContent=sections[si][0];$('helpText').innerHTML=measurementHelp[si][ri]||'Follow the measurement conditions shown in the full Instructions.';$('measureHelp').showModal()}
+          """
+          if marker not in s: raise SystemExit('status marker not found')
+          s=s.replace(marker,helpcode+marker,1)
+          oldrow='<button class="nowbtn" onclick="setNow(this)">Now</button></div></td>'
+          newrow='<button class="nowbtn" onclick="setNow(this)">Now</button><button type="button" class="helpbtn" title="Show measurement conditions" aria-label="Show measurement conditions" onclick="showMeasureHelp(${si},${ri})">?</button></div></td>'
+          if oldrow not in s: raise SystemExit('row marker not found')
+          s=s.replace(oldrow,newrow,1)
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add aap_tracker/index.html
+          git commit -m "Add measurement-condition popup to every entry row"
+          git push
